@@ -1,14 +1,25 @@
-%IMPORTACION DE PAQUETES
+  %Importación de Paquetes
 pkg load optim;
 pkg load geometry;
 pkg load control;
+pkg load io;
+pkg load image;
 
+function data = cargar_csv()
+  [archivo, ruta] = uigetfile('*.csv', 'Selecciona el mapa');
+  if isequal(archivo, 0)
+    disp('No se seleccionó ningún mapa.'); 1
+    data = [];
+  else
+    filepath = fullfile(ruta, archivo);
+    data = csvread(filepath, 1, 0);
+  end
+end
+%
 
-% esta la uso para generar posiciones iniciales aleatorias
 function posiciones = generar_posiciones_aleatorias(num_antenas, polygon)
     posiciones = [];
     while rows(posiciones) < num_antenas
-        % Generar un punto aleatorio
         x_min = min(polygon(:, 1));
         x_max = max(polygon(:, 1));
         y_min = min(polygon(:, 2));
@@ -21,19 +32,38 @@ function posiciones = generar_posiciones_aleatorias(num_antenas, polygon)
     end
 end
 
-% calcula cuanto del area de mi objetivo es cubierta por las antenas
-function [costo, area_cubierta_porcentaje, area_interseccion, area_total_cubierta] = calcular_costo(posiciones, radio_antena, polygon, area_objetivo)
-    % Crear una grilla de puntos dentro del bounding box del polígono
+#funcion de prueba, intentar sacar la nube de circulos
+function obstaculos_1 = generar_obstaculos(numero_deantenas, poligonos)
+    obstaculos_1 = [100];
+    while restricciones(obstaculos_1) < numero_deantenas
+        x_minimo = minimo (poligono(:, 1));
+        x_maximo = maximo (poligono(:, 1));
+        y_minimo = minimo (poligono(:, 1));
+        x_maximo = maximo (poligono(:, 1));
+        x_rand = x_minimo + rand * (x_maximo - x_minimo);
+        y_rand = y_minimo + rand * (x_minimio - y_minimo);
+        if obstaculos_1 (x_rand, y_rand, poligono(:, 1), poligono(:, 2))
+            posiciones = [posiciones; x_minimi, y_maximo, x_rand, y_rand];
+        endif
+    endwhile
+    end
+#ccc%%%
+%%
+%te dare un pequeño contexto: tengo circulos que representan los radio de cobertura de una antena y entre ellos se encuentran obstaculos (que representare por rectangulos)
+%los cuales no permitiran que el radio de esos circulos avancen  hagan que mi zona de cobertura se reduzca del area total que tenia de los circulos al principio (sin los obstaculos) quiero calcular y representar graficamente ese resultado
+
+function [costo, area_cubierta_porcentaje, area_interseccion_porcentaje, area_total_cubierta_porcentaje] = calcular_costo(posiciones, radio_antena, polygon, area_objetivo)
     x_min = min(polygon(:, 1));
     x_max = max(polygon(:, 1));
     y_min = min(polygon(:, 2));
     y_max = max(polygon(:, 2));
     [X, Y] = meshgrid(linspace(x_min, x_max, 100), linspace(y_min, y_max, 100));
     puntos_grilla = [X(:), Y(:)];
-
-    % Filtrar puntos dentro del polígono
     in = inpolygon(puntos_grilla(:, 1), puntos_grilla(:, 2), polygon(:, 1), polygon(:, 2));
     puntos_grilla = puntos_grilla(in, :);
+
+    % Calcula el área de cada celda en la grilla
+    area_celda = (x_max - x_min) / 100 * (y_max - y_min) / 100;
 
     cobertura = zeros(size(puntos_grilla, 1), 1);
 
@@ -42,51 +72,68 @@ function [costo, area_cubierta_porcentaje, area_interseccion, area_total_cubiert
         cobertura = cobertura + (d <= radio_antena);
     end
 
-    area_cubierta = sum(cobertura > 0);
-    area_interseccion = sum(cobertura > 1);
-    area_total_cubierta = sum(cobertura >= 1);
+    area_cubierta = area_celda * sum(cobertura > 0);
+    area_interseccion = area_celda * sum(cobertura > 1);
+    area_total_cubierta = area_celda * sum(cobertura >= 1);
 
-    % Calcular el porcentaje del área cubierta
     area_cubierta_porcentaje = (area_cubierta / area_objetivo) * 100;
+    area_interseccion_porcentaje = (area_interseccion / area_objetivo) * 100;
+    area_total_cubierta_porcentaje = (area_total_cubierta / area_objetivo) * 100;
 
     costo = area_objetivo - area_cubierta;
 
-    % Penalización si no se cumple el área deseada
     if area_cubierta < area_objetivo
-        penalizacion = (area_objetivo - area_cubierta) * 10; % Ajustar el factor de penalización según sea necesario
+        penalizacion = (area_objetivo - area_cubierta) * 10;
         costo = costo + penalizacion;
     end
 end
 
-% Función para generar una nueva de antenas
+
+%
 function nuevas_posiciones = perturbar(posiciones, polygon)
-    idx = randi(size(posiciones, 1)); %al azar indici idx g numero aleatorio 1 y N'A
-    nuevas_posiciones = posiciones; %copia
-    nuevas_posiciones(idx, :) = generar_posiciones_aleatorias(1, polygon); %nueva p reemplaza la antigua
+    idx = randi(size(posiciones, 1));
+    nuevas_posiciones = posiciones;
+    nuevas_posiciones(idx, :) = generar_posiciones_aleatorias(1, polygon);
 end
 
-% Función principal para ejecutar el algoritmo
+%la magia de generar el archivo kml para leerse en el Earth
+function generar_kml(nombre_archivo, coordenadas)
+    fid = fopen(nombre_archivo, 'w');
+    fprintf(fid, '<?xml version="1.0" encoding="UTF-8"?>\n');
+    fprintf(fid, '<kml xmlns="http://www.opengis.net/kml/2.2">\n');
+    fprintf(fid, '  <Document>\n');
+    fprintf(fid, '    <name>Posiciones de Antenas</name>\n');
+    for i = 1:size(coordenadas, 1)
+        fprintf(fid, '    <Placemark>\n');
+        fprintf(fid, '      <name>Antena: %d</name>\n', i);
+        fprintf(fid, '      <Point>\n');
+        fprintf(fid, '        <coordinates>%.6f,%.6f,0</coordinates>\n', coordenadas(i, 1), coordenadas(i, 2));
+        fprintf(fid, '      </Point>\n');
+        fprintf(fid, '    </Placemark>\n');
+    end
+    fprintf(fid, '  </Document>\n');
+    fprintf(fid, '</kml>\n');
+    fclose(fid);
+end
 
-function ejecutar_algoritmo(num_antenas, radio_antena)
+
+function ejecutar_algoritmo(num_antenas, radio_antena, txt_temp, data)
     % Parámetros del algoritmo
-    temp_inicial = 100;
-    temp_final = 0.01;
-    alfa = 0.9; % Factor de enfriamiento
-    max_iter = 1000;
+    temp_inicial = 200;
+    temp_final = 1;
+    alfa = 0.999;
+    max_iter = 1750;
 
-    % Cargar el archivo CSV con las coordenadas del área de la zona urbana de San Marcos
-    data = csvread('ijuiprueba.csv', 1, 0);
-
-    % Separar las columnas de latitud y longitud
+    % Lectura de las coordenadas
     lat = data(:, 1);
     lon = data(:, 2);
 
-    % Convertir las coordenadas de grados a metros
-    R = 6378137; % Radio total de la tierra en metros
-    x = lon * (pi / 180) * R * cosd(mean(lat)); % Longitud para metros
-    y = lat * (pi / 180) * R; % Latitud para metros
+    % Calcular el área usando latitud y longitud
+    R = 6378137; % Radio de la Tierra en metros
+    x = lon * (pi / 180) *  R * cosd(mean(lat));
+    y = lat * (pi / 180) * R;
 
-    % Calcular el área usando la fórmula de Shoelace
+    % Calcular el área del polígono
     area = 0;
     n = length(x);
     for i = 1:n
@@ -94,79 +141,92 @@ function ejecutar_algoritmo(num_antenas, radio_antena)
         area = area + x(i) * y(j) - y(i) * x(j);
     end
     area = abs(area) / 2;
-
-    % Convertir el área de metros cuadrados a kilómetros cuadrados
     area_km2 = area / 1e6;
-    printf('El área de su Zona de Cobertura es: %.2f km^2\n', area_km2);
-
-    % Definir el polígono del área urbana
+    %fprintf('--- Resultados ---\n');
+    %printf('Zona de Cobertura: %.2f km^2\n', area_km2);
     polygon = [x, y];
-
-    % Calcular el área usando la fórmula de Gauss
-    area = polygonArea(polygon); % Función del paquete geometry
-    area_objetivo = area; % Mantener en metros cuadrados
-
+    area_objetivo = polygonArea(polygon);
     posiciones = generar_posiciones_aleatorias(num_antenas, polygon);
 
     % Simulated Annealing
     T = temp_inicial;
-    [mejor_costo, area_cubierta, area_interseccion, area_total_cubierta] = calcular_costo(posiciones, radio_antena, polygon, area_objetivo);
+    [mejor_costo, area_cubierta_porcentaje, area_interseccion_porcentaje, area_total_cubierta_porcentaje] = calcular_costo(posiciones, radio_antena, polygon, area_objetivo);
     mejor_solucion = posiciones;
 
-    while T > temp_final && area_cubierta < area_objetivo
-        for i = 1:max_iter
-            nueva_solucion = perturbar(posiciones, polygon);
-            [nuevo_costo, nueva_area_cubierta, nueva_area_interseccion, nueva_area_total_cubierta] = calcular_costo(nueva_solucion, radio_antena, polygon, area_objetivo);
-            delta_E = nuevo_costo - mejor_costo;
-
-            if delta_E < 0 || rand() < exp(-delta_E / T)
-                posiciones = nueva_solucion;
-                mejor_costo = nuevo_costo;
-                mejor_solucion = nueva_solucion;
-                area_cubierta = nueva_area_cubierta;
-                area_interseccion = nueva_area_interseccion;
-                area_total_cubierta = nueva_area_total_cubierta;
-            end
-        end
-        T = T * alfa;
-    end
-
-
-
-   % Mostrar la mejor solución encontrada
-    disp('Mejor solución encontrada:');
-    disp(mejor_solucion);
-    disp('Área cubierta de la mejor solución:');
-    disp(area_cubierta);
-    disp('Área de intersección de la mejor solución:');
-    disp(area_interseccion);
-    disp('Área total cubierta de la mejor solución:');
-    disp(area_total_cubierta);
-
-    % Visualización de la mejor solución
+    % Plotar la grafica para visualizar las iteraciones
     figure;
+    subplot(3, 1, 1);
     hold on;
-    % Dibujar el polígono
-    plot(polygon(:, 1), polygon(:, 2), 'k', 'LineWidth', 1.5);
-    fill(polygon(:, 1), polygon(:, 2), 'k', 'FaceAlpha', 0.1); % Rellenar el polígono con transparencia
+    title('COSTO');
+    xlabel('Iteración');
+    ylabel('Costo');
+    cost_plot = plot(0, mejor_costo, 'r');
 
-    % Dibujar los círculos de cobertura y las posiciones de las antenas
-    for i = 1:size(mejor_solucion, 1)
-        rectangle('Position', [mejor_solucion(i, 1) - radio_antena, mejor_solucion(i, 2) - radio_antena, 2 * radio_antena, 2 * radio_antena], ...
-                  'Curvature', [1, 1], 'EdgeColor', 'r', 'LineWidth', 1.5);
-        plot(mejor_solucion(i, 1), mejor_solucion(i, 2), 'bo', 'MarkerFaceColor', 'b');
+    subplot(3, 1, 2);
+    hold on;
+    title('COBERTURA (%)');
+    xlabel('Iteración');
+    ylabel('Cobertura (%)');
+    coverage_plot = plot(0, area_cubierta_porcentaje, 'b');
+
+    subplot(3, 1, 3);
+    hold on;
+    title('TEMPERATURA');
+    xlabel('Iteración');
+    ylabel('Temperatura');
+    temperature_plot = plot(0, T, 'k');
+
+    iter = 0;
+
+    while T > temp_final && iter < max_iter
+        iter = iter + 1;
+        nueva_solucion = perturbar(posiciones, polygon);
+        [nuevo_costo, nueva_area_cubierta_porcentaje, nueva_area_interseccion_porcentaje, nueva_area_total_cubierta_porcentaje] = calcular_costo(nueva_solucion, radio_antena, polygon, area_objetivo);
+        delta_E = nuevo_costo - mejor_costo;
+
+        if delta_E < 0 || rand() < exp(-delta_E / T)
+            posiciones = nueva_solucion;
+            mejor_costo = nuevo_costo;
+            mejor_solucion = nueva_solucion;
+            area_cubierta_porcentaje = nueva_area_cubierta_porcentaje;
+            area_interseccion_porcentaje = nueva_area_interseccion_porcentaje;
+            area_total_cubierta_porcentaje = nueva_area_total_cubierta_porcentaje;
+        end
+
+        % Actualizar gráficos
+        set(cost_plot, 'XData', [get(cost_plot, 'XData'), iter], 'YData', [get(cost_plot, 'YData'), mejor_costo]);
+        set(coverage_plot, 'XData', [get(coverage_plot, 'XData'), iter], 'YData', [get(coverage_plot, 'YData'), area_cubierta_porcentaje]);
+        set(temperature_plot, 'XData', [get(temperature_plot, 'XData'), iter], 'YData', [get(temperature_plot, 'YData'), T]);
+
+        T = alfa * T;
+
+        set(txt_temp, 'String', sprintf('T = %.2f', T));
+        drawnow;
     end
 
-    % Añadir resultados como texto en la gráfica
-    text(min(polygon(:,1)), min(polygon(:,2)) - 1000, ...
-         sprintf('Área cubierta: %.2f', area_cubierta), ...
-         'HorizontalAlignment', 'left', 'VerticalAlignment', 'top');
-    text(min(polygon(:,1)), min(polygon(:,2)) - 2000, ...
-         sprintf('Área de intersección: %.2f', area_interseccion), ...
-         'HorizontalAlignment', 'left', 'VerticalAlignment', 'top');
-    text(min(polygon(:,1)), min(polygon(:,2)) - 3000, ...
-         sprintf('Área total cubierta: %.2f', area_total_cubierta), ...
-         'HorizontalAlignment', 'left', 'VerticalAlignment', 'top');
+    % Crear el archivo KML
+    lat_lon_mejor_solucion = [mejor_solucion(:, 2) / R * (180 / pi), mejor_solucion(:, 1) / (R * cosd(mean(lat))) * (180 / pi)];
+    generar_kml('Posiciones.kml', lat_lon_mejor_solucion);
+
+    % resultados en la ventana de comandos
+    fprintf('--- Resultados ---\n');
+    %fprintf('Área cubierta: %.2f%% del polígono\n', area_cubierta_porcentaje);
+    printf('Area a cubir: %.2f km^2\n', area_km2);
+    fprintf('Área de intersección: %.2f%% \n', area_interseccion_porcentaje);
+    fprintf('Área total cubierta: %.2f%% \n', area_total_cubierta_porcentaje);
+    fprintf('*****************\n');
+
+    % Mostrar resultados en la gráfica de manera destacada
+    figure;
+    plot(polygon(:, 1), polygon(:, 2), 'k-', 'LineWidth', 2);
+    hold on;
+    viscircles(mejor_solucion, radio_antena * ones(size(mejor_solucion, 1), 1), 'EdgeColor', 'b');
+    plot(mejor_solucion(:, 1), mejor_solucion(:, 2), 'ro', 'MarkerFaceColor', 'r');
+
+    % Colocamos un cuadro de texto en la gráfica
+    %dim = [.15 .5 .3 .3];
+    %str = sprintf('Área cubierta: %.2f%%\nÁrea de intersección: %.2f%%\nÁrea total cubierta: %.2f%%', area_cubierta_porcentaje, area_interseccion_porcentaje, area_total_cubierta_porcentaje);
+    %annotation('textbox', dim, 'String', str, 'FitBoxToText', 'on', 'BackgroundColor', 'yellow', 'FontSize', 12, 'FontWeight', 'bold');
 
     hold off;
     axis equal;
@@ -175,16 +235,27 @@ function ejecutar_algoritmo(num_antenas, radio_antena)
     ylabel('Y');
 end
 
-% Interfaz gráfica
-f = figure('Position', [100, 100, 300, 200], 'MenuBar', 'none', 'Name', 'DINA-SOFT 2024', 'NumberTitle', 'off', 'Resize', 'off');
+% Crear la figura principal
+f = figure('Position', [300, 300, 300, 300], 'MenuBar', 'none', 'Name', 'DINA-SOFT 2024', 'NumberTitle', 'off', 'Resize', 'off', 'Color', [0.8 0.8 0.8]);
 
-uicontrol(f, 'Style', 'text', 'Position', [20, 140, 100, 20], 'String', 'No. Antenas LoRa:');
-edit_antenas = uicontrol(f, 'Style', 'edit', 'Position', [150, 140, 100, 20], 'String', '8');
+% Crear el botón para cargar el archivo CSV
+uicontrol(f, 'Style', 'pushbutton', 'Position', [85, 260, 120, 35], 'String', 'Cargar Mapa', 'FontSize', 10, 'FontWeight', 'bold', 'BackgroundColor', [1 1 1], 'Callback', @(src, event) assignin('base', 'data', cargar_csv()));
 
-uicontrol(f, 'Style', 'text', 'Position', [20, 100, 100, 20], 'String', 'Radio de la antena:');
-edit_radio = uicontrol(f, 'Style', 'edit', 'Position', [150, 100, 100, 20], 'String', '1500');
 
-uicontrol(f, 'Style', 'pushbutton', 'Position', [100, 40, 100, 30], 'String', 'Ejecutar', ...
-          'Callback', @(src, event) ejecutar_algoritmo(str2num(get(edit_antenas, 'String')), str2num(get(edit_radio, 'String'))));
+% Crear el texto y cuadro de edición para "Antenas"
+uicontrol(f, 'Style', 'text', 'Position', [20, 180, 100, 35], 'String', 'Antenas:', 'FontSize', 12, 'FontWeight', 'bold', 'BackgroundColor', [0.8 0.8 0.8]);
+edit_antenas = uicontrol(f, 'Style', 'edit', 'Position', [150, 180, 100, 35], 'String', '10', 'FontSize', 12);
+
+% Crear el texto y cuadro de edición para "Radio"
+uicontrol(f, 'Style', 'text', 'Position', [20, 140, 100, 35], 'String', 'Radio (m):', 'FontSize', 12, 'FontWeight', 'bold', 'BackgroundColor', [0.8 0.8 0.8]);
+edit_radio = uicontrol(f, 'Style', 'edit', 'Position', [150, 140, 100, 35], 'String', '100', 'FontSize', 12);
+
+% Cuadro de texto para mostrar la temperatura
+txt_temp = uicontrol(f, 'Style', 'text', 'Position', [20, 100, 230, 35], 'String', 'T = 0', 'FontSize', 12, 'FontWeight', 'bold', 'BackgroundColor', [1 1 1]);
+
+% Botón de optimización
+uicontrol(f, 'Style', 'pushbutton', 'Position', [85, 20, 120, 60], 'String', 'OPTIMIZAR', 'FontSize', 10, 'FontWeight', 'bold', 'BackgroundColor', [1 1 1], 'Callback', @(src, event) ejecutar_algoritmo(str2num(get(edit_antenas, 'String')), str2num(get(edit_radio, 'String')), txt_temp, evalin('base', 'data')));
+
+
 
 
