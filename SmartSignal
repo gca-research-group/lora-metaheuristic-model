@@ -49,8 +49,6 @@ function obstaculos_1 = generar_obstaculos(numero_deantenas, poligonos)
     end
 #ccc%%%
 %%
-%te dare un pequeño contexto: tengo circulos que representan los radio de cobertura de una antena y entre ellos se encuentran obstaculos (que representare por rectangulos)
-%los cuales no permitiran que el radio de esos circulos avancen  hagan que mi zona de cobertura se reduzca del area total que tenia de los circulos al principio (sin los obstaculos) quiero calcular y representar graficamente ese resultado
 
 function [costo, area_cubierta_porcentaje, area_interseccion_porcentaje, area_total_cubierta_porcentaje] = calcular_costo(posiciones, radio_antena, polygon, area_objetivo)
     x_min = min(polygon(:, 1));
