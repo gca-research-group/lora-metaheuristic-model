@@ -47,7 +47,6 @@ function obstaculos_1 = generar_obstaculos(numero_deantenas, poligonos)
         endif
     endwhile
     end
-#ccc%%%
 %%
 
 function [costo, area_cubierta_porcentaje, area_interseccion_porcentaje, area_total_cubierta_porcentaje] = calcular_costo(posiciones, radio_antena, polygon, area_objetivo)
@@ -253,7 +252,3 @@ txt_temp = uicontrol(f, 'Style', 'text', 'Position', [20, 100, 230, 35], 'String
 
 % Botón de optimización
 uicontrol(f, 'Style', 'pushbutton', 'Position', [85, 20, 120, 60], 'String', 'OPTIMIZAR', 'FontSize', 10, 'FontWeight', 'bold', 'BackgroundColor', [1 1 1], 'Callback', @(src, event) ejecutar_algoritmo(str2num(get(edit_antenas, 'String')), str2num(get(edit_radio, 'String')), txt_temp, evalin('base', 'data')));
-
-
-
-
