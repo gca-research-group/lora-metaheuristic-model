@@ -1,4 +1,59 @@
-  %Importación de Paquetes
+SmartSignal.txt
+  %
+  % The script implements an optimisation algorithm based on Simulated Annealing 
+  % to determine the optimal position of antennas in a defined geographical area.
+  % The objective is to maximise signal coverage, taking into account constraints 
+  % such as physical obstacles (buildings) and resource limitations (lack of power or internet).
+  % 1) The script loads a CSV file containing geographical coordinates (latitude and 
+  % longitude) that define the coverage area. 
+  % 2) It then uses an optimisation algorithm 
+  % to find the best antenna layout, minimising the number of antennas needed and maximising coverage. 
+  %
+  % ==========================
+  % Version: 15.01.2025_1.3
+  % Programmer: incognitus
+  % License: Released under the GNU General Public License v3.0 (GPLv3)
+  %
+  % ==========================
+  % Requirements:
+  % Software:
+  % 1) GNU Octave (version 7.2.0 or higher). (https://octave.org/download)
+  % 2) Additional Octave packages: optim, geometry, control, io, image.
+  % 3) Google Earth
+  % 
+  % Input Data:
+  % A CSV file with the geographic coordinates (latitude and longitude) of the coverage area.
+  %
+  % Configuration:
+  % The script must be run in an environment with GNU Octave installed.
+  % The necessary packages must be loaded (pkg load ...).
+  %
+  % How to use SmartSignal.txt
+  % ==========================
+  % Configuration:
+  % Platform configuration:
+  % 1) GNU Octave 9.3.0 installed in C:\Program Files\GNU Octave\
+  % 2) SmartSignal.txt located in current working folder
+  % 
+  % Environment Verification:
+  % Make sure the SmartSignal.txt script is in your current working folder in Octave.
+  % Verify that the CSV file with the coverage area coordinates is available and in the correct format (exemplo.csv).
+  % 
+  %
+  % Execution:
+  % Load the maps:
+  % 1) Click on the ‘Load Map’ button and select a CSV file with the coordinates of the coverage area.
+  % Set Parameters:
+  % 2) Enter the number of antennas and the coverage radius in the corresponding text boxes.
+  % Run Optimisation:
+  % 3) Click the ‘OPTIMIZE’ button to run the Simulated Annealing algorithm.
+  % Results:
+  % 4) Cost, coverage and temperature graphs will be displayed during the run.
+  % 5) The script will generate a KML file (Posiciones.kml) with the optimal antenna positions.
+  % 6) Double click on the generated file (Posiciones.kml) and the antenna positions will be displayed in Google Earth. 
+  % 
+
+%Importación de Paquetes
 pkg load optim;
 pkg load geometry;
 pkg load control;
